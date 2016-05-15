@@ -11,31 +11,24 @@ This software should be your last choice for preventing Internet hijacking.
 
 ### 1.1 Build
 
-1. Ubuntu
+- Ubuntu / Debian
 
 ``` bash
-apt install make gcc iptables-dev linux-headers-generic pkg-config
+apt install make gcc iptables-dev linux-headers-`uname -r` pkg-config
 make
 ```
 
-2. Debian
+- Fedora
 
 ``` bash
-apt install make gcc iptables-dev kernel-package pkg-config
+dnf install make gcc iptables-devel kernel-devel-`uname -r` pkgconfig
 make
 ```
 
-3. Fedora
+- RHEL / CentOS
 
 ``` bash
-dnf install make gcc iptables-devel kernel-devel pkgconfig
-make
-```
-
-4. RHEL / CentOS
-
-``` bash
-yum install make gcc iptables-devel kernel-devel pkgconfig
+yum install make gcc iptables-devel kernel-devel-`uname -r` pkgconfig
 make
 ```
 
@@ -43,12 +36,14 @@ make
 
 ``` bash
 make install
+depmod
 ```
 
 ## 1.3. Uninstall
 
 ``` bash
 make uninstall
+depmod
 ```
 
 ## 2. Usage
@@ -64,10 +59,11 @@ To match and drop those spoofed DNS responses, we can use following commands:
 # for IPv4 network
 iptables -t mangle -A PREROUTING -p udp --sport 53 -m vfree_dns \
   --a 192.0.2.1,198.51.100.1\
+  -j DROP
 # for IPv6 network
 ip6tables -t mangle -A PREROUTING -p udp --sport 53 -m vfree_dns \
   --a 192.0.2.1,198.51.100.1\
-  --j DROP
+  -j DROP
 ```
 
 Use `-h` option for help.
@@ -77,7 +73,7 @@ iptables -m vfree_dns -h
 
 ## 3. TO-DO
 
-- HTTPFilter: a netfilter module to match and filter proofed HTTP message
+- HTTPFilter: a netfilter module to match and filter proofed HTTP messages
 
 ## 4. LICENSE
 
