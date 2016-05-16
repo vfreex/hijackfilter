@@ -28,6 +28,7 @@
 #include <linux/vmalloc.h>
 #include <linux/sort.h>
 #include <asm/unaligned.h>
+#include <net/ipv6.h>
 #include "xt_vfree_dns.h"
 #include "dns.h"
 
@@ -38,6 +39,7 @@
 union vfree_dns_record_group {
 	void *data;
 	struct vfree_dns_a_item *a;
+	struct vfree_dns_aaaa_item *aaaa;
 };
 
 struct vfree_dns_record_group_kernel {
@@ -54,6 +56,23 @@ static const struct vfree_dns_a_item *binarry_search4(const struct vfree_dns_a_i
 		if (addresses[medium].ip < *target)
 			left = medium + 1;
 		else if (addresses[medium].ip > *target)
+			right = medium;
+		else
+			return addresses + medium;
+	}
+	return false;
+}
+
+static const struct vfree_dns_aaaa_item *binarry_search6(const struct vfree_dns_aaaa_item *addresses, size_t count, const struct in6_addr *target)
+{
+	size_t left = 0, right = count, medium;
+	int cmp;
+	while (left < right) {
+		medium = left + (right - left) / 2;
+		cmp = ipv6_addr_cmp((const struct in6_addr *)addresses[medium].ip, target);
+		if (cmp < 0)
+			left = medium + 1;
+		else if (cmp > 0)
 			right = medium;
 		else
 			return addresses + medium;
@@ -182,9 +201,22 @@ static bool record_match(const struct vfree_dns_record_group_kernel *record_grou
 				return false;
 			}
 			address = be32_to_cpu(get_u32(p, 0));
-			pr_devel("A %pI4\n", p);
+			pr_devel("A %pI4\n", &address);
 			if (binarry_search4(record_group->records.a, record_group->count, &address)) {
 				pr_devel("address matches (answered address: %pI4)\n", &address);
+				return true;
+			}
+		}
+		else if ((record_group->flags & XT_VFREE_DNS_AAAA) && type == DNS_TYPE_AAAA) {
+			struct in6_addr address;
+			if (rdlength != 16) {
+				pr_devel("invalid AAAA record length\n");
+				return false;
+			}
+			memcpy(&address, p, 16);
+			pr_devel("A %pI6\n", &address);
+			if (binarry_search6(record_group->records.aaaa, record_group->count, &address)) {
+				pr_devel("address matches (answered address: %pI6)\n", &address);
 				return true;
 			}
 		}
@@ -319,11 +351,18 @@ static bool vfree_dns_mt6(const struct sk_buff *skb, struct xt_action_param *par
 	return false;
 }
 
-static int vfree_dns_a_item_compare(const void *lhs, const void *rhs)
+static inline int vfree_dns_a_item_compare(const void *lhs, const void *rhs)
 {
 	struct vfree_dns_a_item *l = (struct vfree_dns_a_item *)lhs,
 		*r = (struct vfree_dns_a_item *)rhs;
 	return l->ip < r->ip ? -1 : (l->ip > r->ip ? 1 : 0);
+}
+
+static inline int vfree_dns_aaaa_item_compare(const void *lhs, const void *rhs)
+{
+	struct vfree_dns_aaaa_item *l = (struct vfree_dns_aaaa_item *)lhs,
+		*r = (struct vfree_dns_aaaa_item *)rhs;
+	return ipv6_addr_cmp((const struct in6_addr *)l->ip, (const struct in6_addr *)r->ip);
 }
 
 static int vfree_dns_mt_check(const struct xt_mtchk_param *par)
@@ -331,18 +370,23 @@ static int vfree_dns_mt_check(const struct xt_mtchk_param *par)
 	int ret = 0, i;
 	struct xt_vfree_dns_mtinfo *info = par->matchinfo;
 	struct vfree_dns_a_item *a_item;
+	struct vfree_dns_aaaa_item *aaaa_item;
 	size_t records_size;
 
 	pr_devel("vfree_dns_mt_check() was called.\n");
 
 	if (info->flags & XT_VFREE_DNS_A) {
-		pr_devel("There are %d A records to match.\n", (int)info->records_count);
+		if (info->flags & XT_VFREE_DNS_AAAA) {
+			pr_devel("You can specify either XT_VFREE_DNS_A or XT_VFREE_DNS_AAAA, not both.\n");
+			return -EINVAL;
+		}
 		if (info->records_count == 0) {
 			pr_devel("No A records to match.\n");
 			return -EINVAL;
 		}
+		pr_devel("There are %zu A records to match.\n", (size_t)info->records_count);
 		if (info->records_count > MAX_A_RECORDS) {
-			pr_devel("A records limit exceeded: %d\n", MAX_A_RECORDS);
+			pr_devel("A records limit exceeded: %u\n", MAX_A_RECORDS);
 			return -EINVAL;
 		}
 		info->priv = kmalloc(sizeof(struct vfree_dns_record_group_kernel), GFP_KERNEL);
@@ -366,6 +410,37 @@ static int vfree_dns_mt_check(const struct xt_mtchk_param *par)
 		}
 		sort(info->priv->records.a, info->priv->count, sizeof(struct vfree_dns_a_item), vfree_dns_a_item_compare, NULL);
 	}
+	else if (info->flags & XT_VFREE_DNS_AAAA) {
+		if (info->records_count == 0) {
+			pr_devel("No AAAA records to match.\n");
+			return -EINVAL;
+		}
+		pr_devel("There are %zu AAAA records to match.\n", (size_t)info->records_count);
+		if (info->records_count > MAX_A_RECORDS) {
+			pr_devel("AAAA records limit exceeded: %u\n", MAX_AAAA_RECORDS);
+			return -EINVAL;
+		}
+		info->priv = kmalloc(sizeof(struct vfree_dns_record_group_kernel), GFP_KERNEL);
+		pr_devel("kmalloc(): info->priv = %p\n", info->priv);
+		if (!info->priv)
+			return -ENOMEM;
+		records_size = sizeof(struct vfree_dns_aaaa_item) * info->records_count;
+		info->priv->records.aaaa = vmalloc(records_size);
+		pr_devel("vmalloc(): info->priv->records.aaaa = %p, records_size = %zu\n", info->priv->records.a, records_size);
+		if (!info->priv->records.aaaa) {
+			ret = ENOMEM;
+			goto cleanup_priv;
+		}
+		info->priv->flags = info->flags;
+		info->priv->count = info->records_count;
+		for (i = 0; i < info->records_count; ++i) {
+			aaaa_item = (struct vfree_dns_aaaa_item *)info->argument + i;
+			pr_devel("A record: %pI6/%d\n", &aaaa_item->ip, aaaa_item->prefix);
+			memcpy(info->priv->records.aaaa[i].ip, aaaa_item->ip, 128);
+			info->priv->records.aaaa[i].prefix = aaaa_item->prefix;
+		}
+		sort(info->priv->records.aaaa, info->priv->count, sizeof(struct vfree_dns_aaaa_item), vfree_dns_aaaa_item_compare, NULL);
+	}
 	else {
 		pr_devel("Nothing to match.\n");
 		return -EINVAL;
@@ -382,10 +457,9 @@ static void vfree_dns_mt_destroy(const struct xt_mtdtor_param *par)
 	struct xt_vfree_dns_mtinfo *info = par->matchinfo;
 	pr_devel("vfree_dns_mt_destroy() was called.\n");
 	if (info->priv) {
-		pr_devel("There are %d A records to match.\n", (int)info->priv->count);
-		if (info->priv->records.a) {
-			pr_devel("vfree(): info->priv->records.a = %p\n", info->priv->records.a);
-			vfree(info->priv->records.a);
+		if (info->priv->records.data) {
+			pr_devel("vfree(): info->priv->records.data = %p\n", info->priv->records.data);
+			vfree(info->priv->records.data);
 		}
 		pr_devel("kfree(): info->priv =%p\n", info->priv);
 		kfree(info->priv);

@@ -20,18 +20,25 @@
 #define _XT_VFREE_DNS_H_
 
 struct vfree_dns_a_item {
-	uint32_t ip;
+	uint32_t ip; // network byte order in userspace, host byte order in kernelspace
+	uint8_t prefix;
+};
+
+struct vfree_dns_aaaa_item {
+	uint16_t ip[8]; // network byte order
 	uint8_t prefix;
 };
 
 enum {
 	MAX_ARGUMENT_SIZE = 4096,
 	MAX_A_RECORDS = MAX_ARGUMENT_SIZE / sizeof(struct vfree_dns_a_item),
+	MAX_AAAA_RECORDS = MAX_ARGUMENT_SIZE / sizeof(struct vfree_dns_aaaa_item),
 };
 
 enum {
 	XT_VFREE_DNS_INV = 1 << 0,
 	XT_VFREE_DNS_A = 1 << 1,
+	XT_VFREE_DNS_AAAA = 1 << 2,
 };
 
 struct xt_vfree_dns_mtinfo {
