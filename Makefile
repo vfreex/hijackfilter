@@ -21,12 +21,14 @@ INSTALL_TARGETS := $(SUBDIRS:%=%/install)
 UNINSTALL_TARGETS := $(SUBDIRS:%=%/uninstall)
 CLEAN_TARGETS := $(SUBDIRS:%=%/clean)
 
-DEBUG ?= 0
+export DEBUG ?= 0
+export DESTDIR ?= test2
+export PREFIX ?= /usr/local
 
 all: $(BUILD_TARGETS)
 
 $(BUILD_TARGETS):
-	@$(MAKE) -C $@ DEBUG=$(DEBUG)
+	@$(MAKE) -C $@
 
 $(CLEAN_TARGETS):
 	@$(MAKE) -C $(@:%/clean=%) clean

@@ -14,19 +14,21 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-SUBDIRS := libxt_vfree_dns
+SUBDIRS := libxt_vfree_dns xt_vfree_dns
 
 BUILD_TARGETS := $(SUBDIRS)
 INSTALL_TARGETS := $(SUBDIRS:%=%/install)
 UNINSTALL_TARGETS := $(SUBDIRS:%=%/uninstall)
 CLEAN_TARGETS := $(SUBDIRS:%=%/clean)
 
-DEBUG ?= 0
+export DEBUG ?= 0
+export DESTDIR ?=
+export PREFIX ?= /usr/local
 
 all: $(BUILD_TARGETS)
 
 $(BUILD_TARGETS):
-	@$(MAKE) -C $@ DEBUG=$(DEBUG)
+	@$(MAKE) -C $@
 
 $(CLEAN_TARGETS):
 	@$(MAKE) -C $(@:%/clean=%) clean
