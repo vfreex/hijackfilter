@@ -24,7 +24,6 @@
 #include <getopt.h>
 #include <errno.h>
 #include <xtables.h>
-#include "common/list.h"
 #include "xt_vfree_dns.h"
 
 #if DEBUG

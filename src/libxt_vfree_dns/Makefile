@@ -15,17 +15,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 XTABLES_LIBS := libxt_vfree_dns.so
-MODULES := xt_vfree_dns.ko
-INCLUDES :=  -I../
+INCLUDES :=  -I../xt_vfree_dns
 
-DESTDIR :=
-PREFIX := /usr/local
+DESTDIR ?=
+PREFIX ?= /usr/local
 INSTALL := install -c
 INSTALLDATA := install -m 644
 XTABLES_LIBDIR := $(shell pkg-config --variable=xtlibdir xtables)
-MODULES_DIR := /lib/modules/$(shell uname -r)
 
-INSTALL_MODULES_DIR = $(DESTDIR)/$(MODULES_DIR)/extra/vfree
 INSTALL_XTABLES_LIBDIR = $(DESTDIR)/$(XTABLES_LIBDIR)
 DEBUG ?= 0
 ifeq ($(DEBUG), 1)
@@ -40,11 +37,8 @@ check:
 ifeq ($(XTABLES_LIBDIR),)
 	$(error 'Failed to locate your Xtables extension path. Please try defining XTABLES_LIBDIR.')
 endif
-ifeq ($(MODULES_DIR),/lib/modules/)
-	$(error 'Failed to locate your kernel module path. Please try defining MODULES_DIR.')
-endif
 
-build: check $(XTABLES_LIBS) modules
+build: check $(XTABLES_LIBS)
 
 lib%.so: lib%.o
 	@$(CC) -shared -fPIC -o $@ $^
@@ -52,30 +46,15 @@ lib%.so: lib%.o
 lib%.o: lib%.c
 	@$(CC) $(CFLAGS) $(INCLUDES) -D_INIT=lib$*_init -fPIC -c -o $@ $<
 
-modules: $(MODULES)
-
-$(MODULES):
-	@$(MAKE) -f Kbuild obj-m="$(MODULES:.ko=.o)" DEBUG=$(DEBUG) modules
-
-modules/install: modules
-	@mkdir -p $(INSTALL_MODULES_DIR)
-	@$(INSTALL) -t $(INSTALL_MODULES_DIR) $(MODULES)
-
-modules/uninstall:
-	@rm -f $(MODULES:%=$(INSTALL_MODULES_DIR)/%)
-
-modules/clean:
-	@$(MAKE) -f Kbuild clean
-
-clean: modules/clean
+clean:
 	@rm -f *.o $(XTABLES_LIBS)
 
-install: all modules/install
-	@mkdir -p $(INSTALL_XTABLES_LIBDIR)
-	@$(INSTALL) -t $(INSTALL_XTABLES_LIBDIR) $(XTABLES_LIBS)
+install: build
+	mkdir -p $(INSTALL_XTABLES_LIBDIR)
+	$(INSTALL) -t $(INSTALL_XTABLES_LIBDIR) $(XTABLES_LIBS)
 
-uninstall: modules/uninstall
-	@rm -f $(XTABLES_LIBS:%=$(INSTALL_XTABLES_LIBDIR)/%)
+uninstall:
+	rm -f $(XTABLES_LIBS:%=$(INSTALL_XTABLES_LIBDIR)/%)
 
 .PHONY: all check build clean install uninstall
 .PHONY: modules modules/clean modules/install modules/uninstall

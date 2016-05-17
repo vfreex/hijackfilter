@@ -1,3 +1,2 @@
-*.mod.c
-Module.symvers
-modules.order
+*.o
+*.so
