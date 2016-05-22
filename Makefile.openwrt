@@ -1,0 +1,89 @@
+# VFREE HijackFilter
+# Copyright (C) 2016 Rayson Zhu <vfreex@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+include $(TOPDIR)/rules.mk
+include $(INCLUDE_DIR)/kernel.mk
+
+PKG_NAME:=hijackfilter
+PKG_VERSION:=0.0.1
+PKG_RELEASE:=1
+PKG_MAINTAINER:=Rayson Zhu <vfreex@gmail.com>
+PKG_LICENSE:=GPL-3.0
+
+PKG_SOURCE:=$(PKG_NAME)-$(PKG_VERSION).tar.bz2
+PKG_SOURCE_SUBDIR:=$(PKG_NAME)-$(PKG_VERSION)
+PKG_SOURCE_URL:=git://github.com/hijackfilter/hijackfilter.git
+PKG_SOURCE_PROTO:=git
+PKG_SOURCE_VERSION:=697e33ab138ed9061bf3b9c6e6fa6b7175d9ebfa
+
+PKG_BUILD_DIR := $(BUILD_DIR)/$(PKG_NAME)-$(PKG_VERSION)
+
+INSTALL_KMOD_DIR := /lib/modules/$(LINUX_VERSION)
+
+include $(INCLUDE_DIR)/package.mk
+
+define Package/hijackfilter/Default
+	SECTION:=net
+	CATEGORY:=Network
+	URL:=https://github.com/hijackfilter/hijackfilter
+endef
+
+define Package/hijackfilter/description/Default
+  VFREE HijackFilter is a set of free software to protect you from Internet hijacking
+endef
+
+define Package/hijackfilter
+$(call Package/hijackfilter/Default)
+	TITLE:=hijackfilter
+	DEPENDS:=+iptables-mod-vfree-dns kmod-vfree-dns
+endef
+
+define Package/iptables-mod-vfree-dns
+$(call Package/hijackfilter/Default)
+	TITLE:=iptables-mod-vfree-dns
+	FILES:=$(PKG_BUILD_DIR)/src/libxt_vfree_dns/libxt_vfree_dns.so
+	DEPENDS:=+kmod-vfree-dns +libxtables
+endef
+
+define KernelPackage/vfree-dns
+$(call Package/hijackfilter/Default)
+	TITLE:=kmod-vfree-dns
+	FILES:=$(PKG_BUILD_DIR)/src/xt_vfree_dns/xt_vfree_dns.ko
+	AUTOLOAD:=$(call AutoLoad,50,$(MADWIFI_AUTOLOAD))
+	DEPENDS:=+kmod-ipt-core
+endef
+
+define Build/Compile
+$(call Build/Compile/Default, KERNEL_DIR=$(LINUX_DIR))
+endef
+
+define Package/hijackfilter/install
+	true
+endef
+
+define Package/iptables-mod-vfree-dns/install
+	$(INSTALL_DIR) $(1)/usr/lib/iptables/
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/libxt_vfree_dns/libxt_vfree_dns.so $(1)/usr/lib/iptables/
+endef
+
+define KernelPackage/vfree-dns/install
+	$(INSTALL_DIR) $(1)/$(INSTALL_KMOD_DIR)
+	$(INSTALL_BIN) $(PKG_BUILD_DIR)/src/xt_vfree_dns/xt_vfree_dns.ko $(1)/$(INSTALL_KMOD_DIR)
+endef
+
+$(eval $(call BuildPackage,hijackfilter))
+$(eval $(call BuildPackage,iptables-mod-vfree-dns))
+$(eval $(call KernelPackage,vfree-dns))
