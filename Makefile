@@ -25,6 +25,12 @@ export DEBUG ?= 0
 export DESTDIR ?= test2
 export PREFIX ?= /usr/local
 
+PACKAGE_NAME := hijackfilter
+PACKAGE_VERSION := $(shell cut -d - -f1 VERSION)
+PACKAGE_RELEASE := $(shell cut -d - -f2 VERSION)
+DIST_DIR := dist
+RPMBUILD_TOPDIR = $(DIST_DIR)/rpmbuild
+
 all: $(BUILD_TARGETS)
 
 $(BUILD_TARGETS):
@@ -44,6 +50,16 @@ install: $(INSTALL_TARGETS)
 uninstall: $(UNINSTALL_TARGETS)
 
 clean: $(CLEAN_TARGETS)
+	@rm -rf -- "$(DIST_DIR)"
+
+dist: clean
+	@mkdir -p "$(DIST_DIR)/$(PACKAGE_NAME)-$(PACKAGE_VERSION)" \
+		&& cp -a {LICENSE,VERSION,Makefile,README.md,*.spec,src} "$(DIST_DIR)/$(PACKAGE_NAME)-$(PACKAGE_VERSION)"
+	@cd "$(DIST_DIR)" && tar -czvf "$(PACKAGE_NAME)-$(PACKAGE_VERSION)".tar.gz "$(PACKAGE_NAME)-$(PACKAGE_VERSION)"
+
+rpm: dist
+	@mkdir -p $(RPMBUILD_TOPDIR)
+	@rpmbuild --define "_topdir `pwd`/$(RPMBUILD_TOPDIR)" -ta "$(DIST_DIR)/$(PACKAGE_NAME)-$(PACKAGE_VERSION)".tar.gz
 
 .PHONY: $(BUILD_TARGETS) $(INSTALL_TARGETS) $(UNINSTALL_TARGETS) $(CLEAN_TARGETS)
-.PHONY: all clean install uninstall
+.PHONY: all clean install uninstall dist rpm
