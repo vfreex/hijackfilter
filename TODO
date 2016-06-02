@@ -1,0 +1,11 @@
+## In Progress
+
+1. HTTPFilter
+
+This will take a long time. I'm trying to make use of the connection tracking feature of Netfilter to support for more complicated filtering.
+Please tell me if you have any suggestion.
+
+2. Packaging for Debian 
+
+## Proposed
+
