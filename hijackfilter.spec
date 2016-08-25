@@ -2,8 +2,11 @@
 %define XTABLES_LIBDIR %(pkg-config --variable=xtlibdir xtables)
 %define MODULES_DIR /lib/modules/%{KERNEL_VERSION}
 %define debug_package %{nil}
-%define PACKAGE_VERSION %(cut -d - -f1 VERSION)
-%define PACKAGE_RELEASE %(cut -d - -f2 VERSION)
+#%define PACKAGE_VERSION %(cut -d - -f1 VERSION)
+#%define PACKAGE_RELEASE %(cut -d - -f2 VERSION)
+%define PACKAGE_VERSION 0.0.1
+%define PACKAGE_RELEASE 2
+
 
 Name:           hijackfilter
 Version:        %{PACKAGE_VERSION}
